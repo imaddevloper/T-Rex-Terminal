@@ -251,8 +251,7 @@ final class TermuxInstaller {
         }
 
         File bashrc = new File(home, ".bashrc");
-        String bashrcContent = "# T-REX Terminal prompt
-" +
+        String bashrcContent = "# T-REX Terminal prompt\n" +
             "if [[ $- == *i* ]]; then\n" +
             "    PS1='\\[\\e[1;31m\\]┌──(T-REX㉿Terminal)-[\\w]\\n└─$\\[\\e[0m\\] '\n" +
             "fi\n";
