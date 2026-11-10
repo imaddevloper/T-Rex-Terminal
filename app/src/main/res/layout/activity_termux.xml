@@ -31,16 +31,6 @@
                 android:layout_height="match_parent"
                 android:background="@color/black">
 
-                <com.termux.view.TerminalView
-                    android:id="@+id/terminal_view"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:defaultFocusHighlightEnabled="false"
-                    android:focusableInTouchMode="true"
-                    android:scrollbarThumbVertical="@drawable/terminal_scroll_shape"
-                    android:scrollbars="vertical"
-                    tools:ignore="UnusedAttribute" />
-
                 <ImageView
                     android:id="@+id/trex_terminal_watermark"
                     android:layout_width="match_parent"
@@ -52,6 +42,16 @@
                     android:focusable="false"
                     android:importantForAccessibility="no"
                     android:contentDescription="@null" />
+
+                <com.termux.view.TerminalView
+                    android:id="@+id/terminal_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:defaultFocusHighlightEnabled="false"
+                    android:focusableInTouchMode="true"
+                    android:scrollbarThumbVertical="@drawable/terminal_scroll_shape"
+                    android:scrollbars="vertical"
+                    tools:ignore="UnusedAttribute" />
 
             </FrameLayout>
 
