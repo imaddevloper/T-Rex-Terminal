@@ -23,15 +23,37 @@
             android:layout_above="@+id/terminal_toolbar_view_pager"
             android:layout_height="match_parent">
 
-            <com.termux.view.TerminalView
-                android:id="@+id/terminal_view"
+            <!-- Keep the watermark as a non-interactive overlay so terminal input and gestures
+                 continue to be handled by TerminalView. -->
+            <FrameLayout
+                android:id="@+id/terminal_content_frame"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:defaultFocusHighlightEnabled="false"
-                android:focusableInTouchMode="true"
-                android:scrollbarThumbVertical="@drawable/terminal_scroll_shape"
-                android:scrollbars="vertical"
-                tools:ignore="UnusedAttribute" />
+                android:background="@color/black">
+
+                <ImageView
+                    android:id="@+id/trex_terminal_watermark"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/background_terminal"
+                    android:scaleType="centerInside"
+                    android:alpha="0.30"
+                    android:clickable="false"
+                    android:focusable="false"
+                    android:importantForAccessibility="no"
+                    android:contentDescription="@null" />
+
+                <com.termux.view.TerminalView
+                    android:id="@+id/terminal_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:defaultFocusHighlightEnabled="false"
+                    android:focusableInTouchMode="true"
+                    android:scrollbarThumbVertical="@drawable/terminal_scroll_shape"
+                    android:scrollbars="vertical"
+                    tools:ignore="UnusedAttribute" />
+
+            </FrameLayout>
 
             <LinearLayout
                 android:id="@+id/left_drawer"
@@ -99,7 +121,7 @@
             android:visibility="gone"
             android:layout_width="match_parent"
             android:layout_height="37.5dp"
-            android:background="@color/black"
+            android:background="@color/trex_extra_keys_bar_background"
             android:layout_alignParentBottom="true" />
 
     </RelativeLayout>

@@ -24,8 +24,10 @@ import com.termux.shared.termux.TermuxUtils;
 import com.termux.shared.termux.shell.command.environment.TermuxShellEnvironment;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -35,6 +37,7 @@ import java.util.zip.ZipInputStream;
 
 import static com.termux.shared.termux.TermuxConstants.TERMUX_PREFIX_DIR;
 import static com.termux.shared.termux.TermuxConstants.TERMUX_PREFIX_DIR_PATH;
+import static com.termux.shared.termux.TermuxConstants.TERMUX_HOME_DIR_PATH;
 import static com.termux.shared.termux.TermuxConstants.TERMUX_STAGING_PREFIX_DIR;
 import static com.termux.shared.termux.TermuxConstants.TERMUX_STAGING_PREFIX_DIR_PATH;
 
@@ -107,6 +110,17 @@ final class TermuxInstaller {
             if (TermuxFileUtils.isTermuxPrefixDirectoryEmpty()) {
                 Logger.logInfo(LOG_TAG, "The termux prefix directory \"" + TERMUX_PREFIX_DIR_PATH + "\" exists but is empty or only contains specific unimportant files.");
             } else {
+                // Remove obsolete optional repository sources that now cause GPG key errors.
+                // The game and science packages are provided by the main repository.
+                removeObsoleteRepositorySources(TERMUX_PREFIX_DIR_PATH);
+
+                // Refresh only the T-REX-managed welcome and prompt block on app startup.
+                // Existing user content in .bashrc is retained.
+                try {
+                    updateTRexWelcomeFiles();
+                } catch (Exception e) {
+                    Logger.logStackTraceWithMessage(LOG_TAG, "Failed to update T-REX welcome files", e);
+                }
                 whenDone.run();
                 return;
             }
@@ -189,10 +203,20 @@ final class TermuxInstaller {
                                 }
 
                                 if (!isDirectory) {
-                                    try (FileOutputStream outStream = new FileOutputStream(targetFile)) {
+                                    byte[] entryBytes;
+                                    try (ByteArrayOutputStream entryOutput = new ByteArrayOutputStream()) {
                                         int readBytes;
                                         while ((readBytes = zipInput.read(buffer)) != -1)
-                                            outStream.write(buffer, 0, readBytes);
+                                            entryOutput.write(buffer, 0, readBytes);
+                                        entryBytes = entryOutput.toByteArray();
+                                    }
+                                    // Replace only the stock welcome message. Preserve any legacy
+                                    // environment warning so users are not misled about package support.
+                                    if ("etc/motd".equals(zipEntryName)) {
+                                        entryBytes = buildTRexMotd(entryBytes);
+                                    }
+                                    try (FileOutputStream outStream = new FileOutputStream(targetFile)) {
+                                        outStream.write(entryBytes);
                                     }
                                     if (zipEntryName.startsWith("bin/") || zipEntryName.startsWith("libexec") ||
                                         zipEntryName.startsWith("lib/apt/apt-helper") || zipEntryName.startsWith("lib/apt/methods")) {
@@ -210,6 +234,9 @@ final class TermuxInstaller {
                         Os.symlink(symlink.first, symlink.second);
                     }
 
+                    // Keep fresh installations on the supported main repository only.
+                    removeObsoleteRepositorySources(TERMUX_STAGING_PREFIX_DIR_PATH);
+
                     Logger.logInfo(LOG_TAG, "Moving termux prefix staging to prefix directory.");
 
                     if (!TERMUX_STAGING_PREFIX_DIR.renameTo(TERMUX_PREFIX_DIR)) {
@@ -220,6 +247,7 @@ final class TermuxInstaller {
 
                     // Recreate env file since termux prefix was wiped earlier
                     TermuxShellEnvironment.writeEnvironmentToFile(activity);
+                    createDefaultBashStartupFiles();
 
                     activity.runOnUiThread(whenDone);
 
@@ -237,6 +265,140 @@ final class TermuxInstaller {
                 }
             }
         }.start();
+    }
+
+    /**
+     * Remove only the obsolete optional game/science APT source files.
+     * Their packages have been merged into the main repository, so retaining
+     * these old sources can trigger EXPKEYSIG errors during apt update.
+     */
+    private static void removeObsoleteRepositorySources(String prefixPath) {
+        String[] obsoleteSources = {
+            "etc/apt/sources.list.d/game.list",
+            "etc/apt/sources.list.d/science.list",
+            "etc/apt/sources.list.d/game.sources",
+            "etc/apt/sources.list.d/science.sources"
+        };
+
+        for (String relativePath : obsoleteSources) {
+            File sourceFile = new File(prefixPath, relativePath);
+            if (sourceFile.exists()) {
+                if (sourceFile.delete()) {
+                    Logger.logInfo(LOG_TAG, "Removed obsolete APT source: " + relativePath);
+                } else {
+                    Logger.logWarn(LOG_TAG, "Could not remove obsolete APT source: " + sourceFile.getAbsolutePath());
+                }
+            } else {
+                Logger.logVerbose(LOG_TAG, "Obsolete APT source is not present: " + relativePath);
+            }
+        }
+    }
+
+    /**
+     * Refresh T-REX-managed welcome files for both new and existing installations.
+     * User-owned content outside the marked .bashrc block is preserved.
+     */
+    private static void updateTRexWelcomeFiles() throws Exception {
+        File motd = new File(TERMUX_PREFIX_DIR_PATH, "etc/motd");
+        if (motd.isFile()) {
+            byte[] original;
+            try (FileInputStream input = new FileInputStream(motd);
+                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[4096];
+                int count;
+                while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                original = output.toByteArray();
+            }
+            try (FileOutputStream output = new FileOutputStream(motd)) {
+                output.write(buildTRexMotd(original));
+            }
+        }
+        createDefaultBashStartupFiles();
+    }
+
+    /**
+     * Build the T-REX welcome screen while retaining a genuine legacy-environment warning.
+     */
+    private static byte[] buildTRexMotd(byte[] original) throws Exception {
+        String source = new String(original, "UTF-8");
+        String legacyWarning = "";
+        if (source.contains("legacy Termux environment") || source.contains("[WARNING] Legacy Termux environment detected.")) {
+            legacyWarning = "\n\033[1;31m[WARNING] Legacy Termux environment detected.\033[0m\n" +
+                "Packages in this environment may be unmaintained and may not receive updates.\n";
+        }
+
+        String motd = "\033[1;31m" +
+            "        T-REX TERMINAL\n" +
+            "\033[0m" +
+            "\033[90m  ANDROID  •  LINUX ENVIRONMENT\033[0m\n\n" +
+            "\033[1;37mWelcome back, Operator.\033[0m\n" +
+            "Your terminal is ready.\n\n" +
+            "\033[1;31m[ SYSTEM INFORMATION ]\033[0m\n" +
+            "OS       : Android\n" +
+            "SHELL    : Bash\n" +
+            "TERMINAL : T-REX\n\n" +
+            "\033[1;31m[ QUICK COMMANDS ]\033[0m\n" +
+            "pkg search <query>   Search packages\n" +
+            "pkg install <name>   Install a package\n" +
+            "pkg update           Update repositories\n" +
+            "pkg upgrade          Upgrade packages\n" +
+            legacyWarning + "\n" +
+            "\033[90mStay curious. Stay secure.\033[0m\n";
+        return motd.getBytes("UTF-8");
+    }
+
+    /**
+     * Install the T-REX prompt and welcome screen for a fresh bootstrap without
+     * overwriting user-owned startup files.
+     */
+    private static void createDefaultBashStartupFiles() throws Exception {
+        File home = new File(TERMUX_HOME_DIR_PATH);
+        if (!home.isDirectory() && !home.mkdirs()) {
+            throw new IllegalStateException("Could not create Termux home directory: " + home);
+        }
+
+        File bashrc = new File(home, ".bashrc");
+        String bashrcContent = "# >>> T-REX managed welcome and prompt >>>\n" +
+            "if [[ $- == *i* ]]; then\n" +
+            "    if [[ -z \"$TREX_WELCOME_SHOWN\" ]]; then\n" +
+            "        export TREX_WELCOME_SHOWN=1\n" +
+            "    fi\n" +
+            "    PS1='\\[\\e[1;31m\\]┌──(T-REX㉿Terminal)-[\\w]\\n└─$\\[\\e[0m\\] '\n" +
+            "fi\n" +
+            "# <<< T-REX managed welcome and prompt <<<\n";
+        String existingBashrc = "";
+        if (bashrc.exists()) {
+            try (FileInputStream input = new FileInputStream(bashrc);
+                 ByteArrayOutputStream existingOutput = new ByteArrayOutputStream()) {
+                byte[] existingBuffer = new byte[4096];
+                int count;
+                while ((count = input.read(existingBuffer)) != -1) {
+                    existingOutput.write(existingBuffer, 0, count);
+                }
+                existingBashrc = new String(existingOutput.toByteArray(), "UTF-8");
+            }
+        }
+        String startMarker = "# >>> T-REX managed welcome and prompt >>>";
+        String endMarker = "# <<< T-REX managed welcome and prompt <<<";
+        int start = existingBashrc.indexOf(startMarker);
+        int end = existingBashrc.indexOf(endMarker);
+        if (start >= 0 && end >= start) {
+            existingBashrc = existingBashrc.substring(0, start) + bashrcContent +
+                existingBashrc.substring(end + endMarker.length()).replaceFirst("^\\\\s*", "");
+        } else {
+            if (!existingBashrc.isEmpty() && !existingBashrc.endsWith("\n")) existingBashrc += "\n";
+            existingBashrc += bashrcContent;
+        }
+        try (FileOutputStream output = new FileOutputStream(bashrc)) {
+            output.write(existingBashrc.getBytes("UTF-8"));
+        }
+
+        File bashProfile = new File(home, ".bash_profile");
+        if (!bashProfile.exists()) {
+            try (FileOutputStream output = new FileOutputStream(bashProfile)) {
+                output.write("if [ -f ~/.bashrc ]; then . ~/.bashrc; fi\n".getBytes("UTF-8"));
+            }
+        }
     }
 
     public static void showBootstrapErrorDialog(Activity activity, Runnable whenDone, String message) {
