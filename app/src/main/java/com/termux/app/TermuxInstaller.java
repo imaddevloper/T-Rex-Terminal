@@ -282,12 +282,14 @@ final class TermuxInstaller {
 
         for (String relativePath : obsoleteSources) {
             File sourceFile = new File(prefixPath, relativePath);
-            if (sourceFile.exists() && !sourceFile.delete()) {
-                Logger.logWarn(LOG_TAG, "Could not remove obsolete APT source: " + sourceFile.getAbsolutePath());
-            } else if (!sourceFile.exists()) {
-                Logger.logVerbose(LOG_TAG, "Obsolete APT source is not present: " + relativePath);
+            if (sourceFile.exists()) {
+                if (sourceFile.delete()) {
+                    Logger.logInfo(LOG_TAG, "Removed obsolete APT source: " + relativePath);
+                } else {
+                    Logger.logWarn(LOG_TAG, "Could not remove obsolete APT source: " + sourceFile.getAbsolutePath());
+                }
             } else {
-                Logger.logInfo(LOG_TAG, "Removed obsolete APT source: " + relativePath);
+                Logger.logVerbose(LOG_TAG, "Obsolete APT source is not present: " + relativePath);
             }
         }
     }
