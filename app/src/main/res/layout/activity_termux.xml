@@ -121,7 +121,7 @@
             android:visibility="gone"
             android:layout_width="match_parent"
             android:layout_height="37.5dp"
-            android:background="@color/black"
+            android:background="@color/trex_extra_keys_bar_background"
             android:layout_alignParentBottom="true" />
 
     </RelativeLayout>
