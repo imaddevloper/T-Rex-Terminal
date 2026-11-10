@@ -109,6 +109,13 @@ final class TermuxInstaller {
             if (TermuxFileUtils.isTermuxPrefixDirectoryEmpty()) {
                 Logger.logInfo(LOG_TAG, "The termux prefix directory \"" + TERMUX_PREFIX_DIR_PATH + "\" exists but is empty or only contains specific unimportant files.");
             } else {
+                // Refresh only the T-REX-managed welcome and prompt block on app startup.
+                // Existing user content in .bashrc is retained.
+                try {
+                    updateTRexWelcomeFiles();
+                } catch (Exception e) {
+                    Logger.logStackTraceWithMessage(LOG_TAG, "Failed to update T-REX welcome files", e);
+                }
                 whenDone.run();
                 return;
             }
@@ -253,12 +260,34 @@ final class TermuxInstaller {
     }
 
     /**
+     * Refresh T-REX-managed welcome files for both new and existing installations.
+     * User-owned content outside the marked .bashrc block is preserved.
+     */
+    private static void updateTRexWelcomeFiles() throws Exception {
+        File motd = new File(TERMUX_PREFIX_DIR_PATH, "etc/motd");
+        if (motd.isFile()) {
+            byte[] original;
+            try (FileInputStream input = new FileInputStream(motd);
+                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[4096];
+                int count;
+                while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                original = output.toByteArray();
+            }
+            try (FileOutputStream output = new FileOutputStream(motd)) {
+                output.write(buildTRexMotd(original));
+            }
+        }
+        createDefaultBashStartupFiles();
+    }
+
+    /**
      * Build the T-REX welcome screen while retaining a genuine legacy-environment warning.
      */
     private static byte[] buildTRexMotd(byte[] original) throws Exception {
         String source = new String(original, "UTF-8");
         String legacyWarning = "";
-        if (source.contains("legacy Termux environment")) {
+        if (source.contains("legacy Termux environment") || source.contains("[WARNING] Legacy Termux environment detected.")) {
             legacyWarning = "\n\033[1;31m[WARNING] Legacy Termux environment detected.\033[0m\n" +
                 "Packages in this environment may be unmaintained and may not receive updates.\n";
         }
