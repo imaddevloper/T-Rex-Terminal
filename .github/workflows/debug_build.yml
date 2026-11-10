@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - trex
       - 'github-releases/**'
   pull_request:
     branches:
@@ -15,7 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package_variant: [ apt-android-7, apt-android-5 ]
+        # T-REX targets Android 7+ devices; do not generate the obsolete Android 5 bootstrap.
+        package_variant: [ apt-android-7 ]
 
     steps:
       - name: Clone repository
