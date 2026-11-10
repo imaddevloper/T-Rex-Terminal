@@ -110,6 +110,10 @@ final class TermuxInstaller {
             if (TermuxFileUtils.isTermuxPrefixDirectoryEmpty()) {
                 Logger.logInfo(LOG_TAG, "The termux prefix directory \"" + TERMUX_PREFIX_DIR_PATH + "\" exists but is empty or only contains specific unimportant files.");
             } else {
+                // Remove obsolete optional repository sources that now cause GPG key errors.
+                // The game and science packages are provided by the main repository.
+                removeObsoleteRepositorySources(TERMUX_PREFIX_DIR_PATH);
+
                 // Refresh only the T-REX-managed welcome and prompt block on app startup.
                 // Existing user content in .bashrc is retained.
                 try {
@@ -230,6 +234,9 @@ final class TermuxInstaller {
                         Os.symlink(symlink.first, symlink.second);
                     }
 
+                    // Keep fresh installations on the supported main repository only.
+                    removeObsoleteRepositorySources(TERMUX_STAGING_PREFIX_DIR_PATH);
+
                     Logger.logInfo(LOG_TAG, "Moving termux prefix staging to prefix directory.");
 
                     if (!TERMUX_STAGING_PREFIX_DIR.renameTo(TERMUX_PREFIX_DIR)) {
@@ -258,6 +265,31 @@ final class TermuxInstaller {
                 }
             }
         }.start();
+    }
+
+    /**
+     * Remove only the obsolete optional game/science APT source files.
+     * Their packages have been merged into the main repository, so retaining
+     * these old sources can trigger EXPKEYSIG errors during apt update.
+     */
+    private static void removeObsoleteRepositorySources(String prefixPath) {
+        String[] obsoleteSources = {
+            "etc/apt/sources.list.d/game.list",
+            "etc/apt/sources.list.d/science.list",
+            "etc/apt/sources.list.d/game.sources",
+            "etc/apt/sources.list.d/science.sources"
+        };
+
+        for (String relativePath : obsoleteSources) {
+            File sourceFile = new File(prefixPath, relativePath);
+            if (sourceFile.exists() && !sourceFile.delete()) {
+                Logger.logWarn(LOG_TAG, "Could not remove obsolete APT source: " + sourceFile.getAbsolutePath());
+            } else if (!sourceFile.exists()) {
+                Logger.logVerbose(LOG_TAG, "Obsolete APT source is not present: " + relativePath);
+            } else {
+                Logger.logInfo(LOG_TAG, "Removed obsolete APT source: " + relativePath);
+            }
+        }
     }
 
     /**
