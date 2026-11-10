@@ -44,8 +44,8 @@ jobs:
             BUILD_SHA="$GITHUB_SHA"
           fi
 
-          VERSION_REGEX='\\s+versionName "([^"]+)"$'
-          CURRENT_VERSION="$(grep -m 1 -E "$VERSION_REGEX" ./app/build.gradle | sed -r "s/$VERSION_REGEX/\\1/")"
+          VERSION_REGEX='\s+versionName "([^"]+)"$'
+          CURRENT_VERSION="$(grep -m 1 -E "$VERSION_REGEX" ./app/build.gradle | sed -r "s/$VERSION_REGEX/\1/")"
           RELEASE_VERSION="${CURRENT_VERSION}+${BUILD_SHA:0:7}"
           APK_TAG="v${RELEASE_VERSION}-${PACKAGE_VARIANT}-github-debug"
           APK_PREFIX="trex-terminal_$APK_TAG"
