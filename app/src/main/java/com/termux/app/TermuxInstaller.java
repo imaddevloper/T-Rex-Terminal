@@ -299,7 +299,7 @@ final class TermuxInstaller {
             "    if [[ -z \\"$TREX_WELCOME_SHOWN\\" ]]; then\n" +
             "        export TREX_WELCOME_SHOWN=1\n" +
             "    fi\n" +
-            "    PS1='\\[\\e[1;31m\\\\]┌──(T-REX㉿Terminal)-[\\w]\\\n└─$\\[\\e[0m\\\\] '\n" +
+            "    PS1='\\[\\e[1;31m\\]┌──(T-REX㉿Terminal)-[\\w]\\n└─$\\[\\e[0m\\] '\n" +
             "fi\n" +
             "# <<< T-REX managed welcome and prompt <<<\n";
         String existingBashrc = "";
