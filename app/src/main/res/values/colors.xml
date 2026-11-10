@@ -1,3 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="trex_red">#F20D18</color>
+    <color name="trex_red_dark">#B20710</color>
+    <color name="trex_black">#000000</color>
 </resources>
