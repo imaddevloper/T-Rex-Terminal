@@ -259,27 +259,27 @@ final class TermuxInstaller {
         String source = new String(original, "UTF-8");
         String legacyWarning = "";
         if (source.contains("legacy Termux environment")) {
-            legacyWarning = "\\n\\033[1;31m[WARNING] Legacy Termux environment detected.\\033[0m\\n" +
-                "Packages in this environment may be unmaintained and may not receive updates.\\n";
+            legacyWarning = "\n\033[1;31m[WARNING] Legacy Termux environment detected.\033[0m\n" +
+                "Packages in this environment may be unmaintained and may not receive updates.\n";
         }
 
-        String motd = "\\033[1;31m" +
-            "        T-REX TERMINAL\\n" +
-            "\\033[0m" +
-            "\\033[90m  ANDROID  •  LINUX ENVIRONMENT\\033[0m\\n\\n" +
-            "\\033[1;37mWelcome back, Operator.\\033[0m\\n" +
-            "Your terminal is ready.\\n\\n" +
-            "\\033[1;31m[ SYSTEM INFORMATION ]\\033[0m\\n" +
-            "OS       : Android\\n" +
-            "SHELL    : Bash\\n" +
-            "TERMINAL : T-REX\\n\\n" +
-            "\\033[1;31m[ QUICK COMMANDS ]\\033[0m\\n" +
-            "pkg search <query>   Search packages\\n" +
-            "pkg install <name>   Install a package\\n" +
-            "pkg update           Update repositories\\n" +
-            "pkg upgrade          Upgrade packages\\n" +
-            legacyWarning + "\\n" +
-            "\\033[90mStay curious. Stay secure.\\033[0m\\n";
+        String motd = "\033[1;31m" +
+            "        T-REX TERMINAL\n" +
+            "\033[0m" +
+            "\033[90m  ANDROID  •  LINUX ENVIRONMENT\033[0m\n\n" +
+            "\033[1;37mWelcome back, Operator.\033[0m\n" +
+            "Your terminal is ready.\n\n" +
+            "\033[1;31m[ SYSTEM INFORMATION ]\033[0m\n" +
+            "OS       : Android\n" +
+            "SHELL    : Bash\n" +
+            "TERMINAL : T-REX\n\n" +
+            "\033[1;31m[ QUICK COMMANDS ]\033[0m\n" +
+            "pkg search <query>   Search packages\n" +
+            "pkg install <name>   Install a package\n" +
+            "pkg update           Update repositories\n" +
+            "pkg upgrade          Upgrade packages\n" +
+            legacyWarning + "\n" +
+            "\033[90mStay curious. Stay secure.\033[0m\n";
         return motd.getBytes("UTF-8");
     }
 
@@ -294,18 +294,25 @@ final class TermuxInstaller {
         }
 
         File bashrc = new File(home, ".bashrc");
-        String bashrcContent = "# >>> T-REX managed welcome and prompt >>>\\n" +
-            "if [[ $- == *i* ]]; then\\n" +
-            "    if [[ -z \\"$TREX_WELCOME_SHOWN\\" ]]; then\\n" +
-            "        export TREX_WELCOME_SHOWN=1\\n" +
-            "    fi\\n" +
-            "    PS1='\\\\[\\\\e[1;31m\\\\]┌──(T-REX㉿Terminal)-[\\\\w]\\\\n└─$\\\\[\\\\e[0m\\\\] '\\n" +
-            "fi\\n" +
-            "# <<< T-REX managed welcome and prompt <<<\\n";
+        String bashrcContent = "# >>> T-REX managed welcome and prompt >>>\n" +
+            "if [[ $- == *i* ]]; then\n" +
+            "    if [[ -z \\"$TREX_WELCOME_SHOWN\\" ]]; then\n" +
+            "        export TREX_WELCOME_SHOWN=1\n" +
+            "    fi\n" +
+            "    PS1='\\[\\e[1;31m\\\\]┌──(T-REX㉿Terminal)-[\\w]\\\n└─$\\[\\e[0m\\\\] '\n" +
+            "fi\n" +
+            "# <<< T-REX managed welcome and prompt <<<\n";
         String existingBashrc = "";
         if (bashrc.exists()) {
-            byte[] existingBytes = java.nio.file.Files.readAllBytes(bashrc.toPath());
-            existingBashrc = new String(existingBytes, "UTF-8");
+            try (FileInputStream input = new FileInputStream(bashrc);
+                 ByteArrayOutputStream existingOutput = new ByteArrayOutputStream()) {
+                byte[] existingBuffer = new byte[4096];
+                int count;
+                while ((count = input.read(existingBuffer)) != -1) {
+                    existingOutput.write(existingBuffer, 0, count);
+                }
+                existingBashrc = new String(existingOutput.toByteArray(), "UTF-8");
+            }
         }
         String startMarker = "# >>> T-REX managed welcome and prompt >>>";
         String endMarker = "# <<< T-REX managed welcome and prompt <<<";
@@ -315,7 +322,7 @@ final class TermuxInstaller {
             existingBashrc = existingBashrc.substring(0, start) + bashrcContent +
                 existingBashrc.substring(end + endMarker.length()).replaceFirst("^\\\\s*", "");
         } else {
-            if (!existingBashrc.isEmpty() && !existingBashrc.endsWith("\\n")) existingBashrc += "\\n";
+            if (!existingBashrc.isEmpty() && !existingBashrc.endsWith("\n")) existingBashrc += "\n";
             existingBashrc += bashrcContent;
         }
         try (FileOutputStream output = new FileOutputStream(bashrc)) {
