@@ -35,7 +35,7 @@
                     android:id="@+id/trex_terminal_watermark"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:src="@drawable/trex_launcher_foreground"
+                    android:src="@drawable/background_terminal"
                     android:scaleType="centerInside"
                     android:alpha="0.30"
                     android:clickable="false"
