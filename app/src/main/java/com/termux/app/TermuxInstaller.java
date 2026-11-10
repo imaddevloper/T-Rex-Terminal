@@ -24,6 +24,7 @@ import com.termux.shared.termux.TermuxUtils;
 import com.termux.shared.termux.shell.command.environment.TermuxShellEnvironment;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -190,10 +191,20 @@ final class TermuxInstaller {
                                 }
 
                                 if (!isDirectory) {
-                                    try (FileOutputStream outStream = new FileOutputStream(targetFile)) {
+                                    byte[] entryBytes;
+                                    try (ByteArrayOutputStream entryOutput = new ByteArrayOutputStream()) {
                                         int readBytes;
                                         while ((readBytes = zipInput.read(buffer)) != -1)
-                                            outStream.write(buffer, 0, readBytes);
+                                            entryOutput.write(buffer, 0, readBytes);
+                                        entryBytes = entryOutput.toByteArray();
+                                    }
+                                    // Replace only the stock welcome message. Preserve any legacy
+                                    // environment warning so users are not misled about package support.
+                                    if ("etc/motd".equals(zipEntryName)) {
+                                        entryBytes = buildTRexMotd(entryBytes);
+                                    }
+                                    try (FileOutputStream outStream = new FileOutputStream(targetFile)) {
+                                        outStream.write(entryBytes);
                                     }
                                     if (zipEntryName.startsWith("bin/") || zipEntryName.startsWith("libexec") ||
                                         zipEntryName.startsWith("lib/apt/apt-helper") || zipEntryName.startsWith("lib/apt/methods")) {
@@ -242,7 +253,39 @@ final class TermuxInstaller {
     }
 
     /**
-     * Install the T-Rex prompt for a fresh bootstrap without overwriting existing user startup files.
+     * Build the T-REX welcome screen while retaining a genuine legacy-environment warning.
+     */
+    private static byte[] buildTRexMotd(byte[] original) throws Exception {
+        String source = new String(original, "UTF-8");
+        String legacyWarning = "";
+        if (source.contains("legacy Termux environment")) {
+            legacyWarning = "\\n\\033[1;31m[WARNING] Legacy Termux environment detected.\\033[0m\\n" +
+                "Packages in this environment may be unmaintained and may not receive updates.\\n";
+        }
+
+        String motd = "\\033[1;31m" +
+            "        T-REX TERMINAL\\n" +
+            "\\033[0m" +
+            "\\033[90m  ANDROID  •  LINUX ENVIRONMENT\\033[0m\\n\\n" +
+            "\\033[1;37mWelcome back, Operator.\\033[0m\\n" +
+            "Your terminal is ready.\\n\\n" +
+            "\\033[1;31m[ SYSTEM INFORMATION ]\\033[0m\\n" +
+            "OS       : Android\\n" +
+            "SHELL    : Bash\\n" +
+            "TERMINAL : T-REX\\n\\n" +
+            "\\033[1;31m[ QUICK COMMANDS ]\\033[0m\\n" +
+            "pkg search <query>   Search packages\\n" +
+            "pkg install <name>   Install a package\\n" +
+            "pkg update           Update repositories\\n" +
+            "pkg upgrade          Upgrade packages\\n" +
+            legacyWarning + "\\n" +
+            "\\033[90mStay curious. Stay secure.\\033[0m\\n";
+        return motd.getBytes("UTF-8");
+    }
+
+    /**
+     * Install the T-REX prompt and welcome screen for a fresh bootstrap without
+     * overwriting user-owned startup files.
      */
     private static void createDefaultBashStartupFiles() throws Exception {
         File home = new File(TERMUX_HOME_DIR_PATH);
@@ -251,14 +294,32 @@ final class TermuxInstaller {
         }
 
         File bashrc = new File(home, ".bashrc");
-        String bashrcContent = "# T-REX Terminal prompt\n" +
-            "if [[ $- == *i* ]]; then\n" +
-            "    PS1='\\[\\e[1;31m\\]┌──(T-REX㉿Terminal)-[\\w]\\n└─$\\[\\e[0m\\] '\n" +
-            "fi\n";
-        if (!bashrc.exists()) {
-            try (FileOutputStream output = new FileOutputStream(bashrc)) {
-                output.write(bashrcContent.getBytes("UTF-8"));
-            }
+        String bashrcContent = "# >>> T-REX managed welcome and prompt >>>\\n" +
+            "if [[ $- == *i* ]]; then\\n" +
+            "    if [[ -z \\"$TREX_WELCOME_SHOWN\\" ]]; then\\n" +
+            "        export TREX_WELCOME_SHOWN=1\\n" +
+            "    fi\\n" +
+            "    PS1='\\\\[\\\\e[1;31m\\\\]┌──(T-REX㉿Terminal)-[\\\\w]\\\\n└─$\\\\[\\\\e[0m\\\\] '\\n" +
+            "fi\\n" +
+            "# <<< T-REX managed welcome and prompt <<<\\n";
+        String existingBashrc = "";
+        if (bashrc.exists()) {
+            byte[] existingBytes = java.nio.file.Files.readAllBytes(bashrc.toPath());
+            existingBashrc = new String(existingBytes, "UTF-8");
+        }
+        String startMarker = "# >>> T-REX managed welcome and prompt >>>";
+        String endMarker = "# <<< T-REX managed welcome and prompt <<<";
+        int start = existingBashrc.indexOf(startMarker);
+        int end = existingBashrc.indexOf(endMarker);
+        if (start >= 0 && end >= start) {
+            existingBashrc = existingBashrc.substring(0, start) + bashrcContent +
+                existingBashrc.substring(end + endMarker.length()).replaceFirst("^\\\\s*", "");
+        } else {
+            if (!existingBashrc.isEmpty() && !existingBashrc.endsWith("\\n")) existingBashrc += "\\n";
+            existingBashrc += bashrcContent;
+        }
+        try (FileOutputStream output = new FileOutputStream(bashrc)) {
+            output.write(existingBashrc.getBytes("UTF-8"));
         }
 
         File bashProfile = new File(home, ".bash_profile");
