@@ -325,7 +325,7 @@ final class TermuxInstaller {
         File bashrc = new File(home, ".bashrc");
         String bashrcContent = "# >>> T-REX managed welcome and prompt >>>\n" +
             "if [[ $- == *i* ]]; then\n" +
-            "    if [[ -z \\"$TREX_WELCOME_SHOWN\\" ]]; then\n" +
+            "    if [[ -z \"$TREX_WELCOME_SHOWN\" ]]; then\n" +
             "        export TREX_WELCOME_SHOWN=1\n" +
             "    fi\n" +
             "    PS1='\\[\\e[1;31m\\]┌──(T-REX㉿Terminal)-[\\w]\\n└─$\\[\\e[0m\\] '\n" +
