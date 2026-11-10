@@ -35,20 +35,15 @@ jobs:
         shell: bash
         env:
           PACKAGE_VARIANT: ${{ matrix.package_variant }}
+          BUILD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-
-          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            BUILD_SHA="${${ github.event.pull_request.head.sha }}"
-          else
-            BUILD_SHA="$GITHUB_SHA"
-          fi
 
           VERSION_REGEX='\s+versionName "([^"]+)"$'
           CURRENT_VERSION="$(grep -m 1 -E "$VERSION_REGEX" ./app/build.gradle | sed -r "s/$VERSION_REGEX/\1/")"
           RELEASE_VERSION="${CURRENT_VERSION}+${BUILD_SHA:0:7}"
           APK_TAG="v${RELEASE_VERSION}-${PACKAGE_VARIANT}-github-debug"
-          APK_PREFIX="trex-terminal_$APK_TAG"
+          APK_PREFIX="termux-app_$APK_TAG"
           APK_DIR="./app/build/outputs/apk/debug"
 
           echo "APK_DIR=$APK_DIR" >> "$GITHUB_ENV"
