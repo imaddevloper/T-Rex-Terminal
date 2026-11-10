@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build:
-    name: Build (\u0024{{ matrix.package_variant }})
+    name: Build (${{ matrix.package_variant }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -34,92 +34,92 @@ jobs:
       - name: Build and validate APKs
         shell: bash
         env:
-          PACKAGE_VARIANT: \u0024{{ matrix.package_variant }}
+          PACKAGE_VARIANT: ${{ matrix.package_variant }}
         run: |
           set -euo pipefail
 
-          if [ "\u0024GITHUB_EVENT_NAME" = "pull_request" ]; then
-            BUILD_SHA="\u0024{\u0024{ github.event.pull_request.head.sha }}"
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            BUILD_SHA="${${ github.event.pull_request.head.sha }}"
           else
-            BUILD_SHA="\u0024GITHUB_SHA"
+            BUILD_SHA="$GITHUB_SHA"
           fi
 
-          VERSION_REGEX='\\s+versionName "([^"]+)"\u0024'
-          CURRENT_VERSION="$(grep -m 1 -E "\u0024VERSION_REGEX" ./app/build.gradle | sed -r "s/\u0024VERSION_REGEX/\\1/")"
-          RELEASE_VERSION="\u0024{CURRENT_VERSION}+\u0024{BUILD_SHA:0:7}"
-          APK_TAG="v\u0024{RELEASE_VERSION}-\u0024{PACKAGE_VARIANT}-github-debug"
-          APK_PREFIX="trex-terminal_\u0024APK_TAG"
+          VERSION_REGEX='\\s+versionName "([^"]+)"$'
+          CURRENT_VERSION="$(grep -m 1 -E "$VERSION_REGEX" ./app/build.gradle | sed -r "s/$VERSION_REGEX/\\1/")"
+          RELEASE_VERSION="${CURRENT_VERSION}+${BUILD_SHA:0:7}"
+          APK_TAG="v${RELEASE_VERSION}-${PACKAGE_VARIANT}-github-debug"
+          APK_PREFIX="trex-terminal_$APK_TAG"
           APK_DIR="./app/build/outputs/apk/debug"
 
-          echo "APK_DIR=\u0024APK_DIR" >> "\u0024GITHUB_ENV"
-          echo "APK_PREFIX=\u0024APK_PREFIX" >> "\u0024GITHUB_ENV"
+          echo "APK_DIR=$APK_DIR" >> "$GITHUB_ENV"
+          echo "APK_PREFIX=$APK_PREFIX" >> "$GITHUB_ENV"
 
-          export TERMUX_APP_VERSION_NAME="\u0024RELEASE_VERSION"
-          export TERMUX_APK_VERSION_TAG="\u0024APK_TAG"
-          export TERMUX_PACKAGE_VARIANT="\u0024PACKAGE_VARIANT"
+          export TERMUX_APP_VERSION_NAME="$RELEASE_VERSION"
+          export TERMUX_APK_VERSION_TAG="$APK_TAG"
+          export TERMUX_PACKAGE_VARIANT="$PACKAGE_VARIANT"
 
           ./gradlew assembleDebug
 
           for abi in universal arm64-v8a armeabi-v7a x86_64 x86; do
-            test -f "\u0024APK_DIR/\u0024{APK_PREFIX}_\u0024abi.apk" || {
-              echo "Missing APK: \u0024APK_DIR/\u0024{APK_PREFIX}_\u0024abi.apk"
-              ls -la "\u0024APK_DIR"
+            test -f "$APK_DIR/${APK_PREFIX}_$abi.apk" || {
+              echo "Missing APK: $APK_DIR/${APK_PREFIX}_$abi.apk"
+              ls -la "$APK_DIR"
               exit 1
             }
           done
 
-          (cd "\u0024APK_DIR" && sha256sum \
-            "\u0024{APK_PREFIX}_universal.apk" \
-            "\u0024{APK_PREFIX}_arm64-v8a.apk" \
-            "\u0024{APK_PREFIX}_armeabi-v7a.apk" \
-            "\u0024{APK_PREFIX}_x86_64.apk" \
-            "\u0024{APK_PREFIX}_x86.apk" \
-            > "\u0024{APK_PREFIX}_sha256sums")
+          (cd "$APK_DIR" && sha256sum \
+            "${APK_PREFIX}_universal.apk" \
+            "${APK_PREFIX}_arm64-v8a.apk" \
+            "${APK_PREFIX}_armeabi-v7a.apk" \
+            "${APK_PREFIX}_x86_64.apk" \
+            "${APK_PREFIX}_x86.apk" \
+            > "${APK_PREFIX}_sha256sums")
 
       - name: Upload universal APK
         uses: actions/upload-artifact@v6
         with:
-          name: trex-universal-\u0024{{ matrix.package_variant }}
+          name: trex-universal-${{ matrix.package_variant }}
           path: |
-            \u0024{{ env.APK_DIR }}/\u0024{{ env.APK_PREFIX }}_universal.apk
-            \u0024{{ env.APK_DIR }}/output-metadata.json
+            ${{ env.APK_DIR }}/${{ env.APK_PREFIX }}_universal.apk
+            ${{ env.APK_DIR }}/output-metadata.json
 
       - name: Upload arm64-v8a APK
         uses: actions/upload-artifact@v6
         with:
-          name: trex-arm64-v8a-\u0024{{ matrix.package_variant }}
+          name: trex-arm64-v8a-${{ matrix.package_variant }}
           path: |
-            \u0024{{ env.APK_DIR }}/\u0024{{ env.APK_PREFIX }}_arm64-v8a.apk
-            \u0024{{ env.APK_DIR }}/output-metadata.json
+            ${{ env.APK_DIR }}/${{ env.APK_PREFIX }}_arm64-v8a.apk
+            ${{ env.APK_DIR }}/output-metadata.json
 
       - name: Upload armeabi-v7a APK
         uses: actions/upload-artifact@v6
         with:
-          name: trex-armeabi-v7a-\u0024{{ matrix.package_variant }}
+          name: trex-armeabi-v7a-${{ matrix.package_variant }}
           path: |
-            \u0024{{ env.APK_DIR }}/\u0024{{ env.APK_PREFIX }}_armeabi-v7a.apk
-            \u0024{{ env.APK_DIR }}/output-metadata.json
+            ${{ env.APK_DIR }}/${{ env.APK_PREFIX }}_armeabi-v7a.apk
+            ${{ env.APK_DIR }}/output-metadata.json
 
       - name: Upload x86_64 APK
         uses: actions/upload-artifact@v6
         with:
-          name: trex-x86_64-\u0024{{ matrix.package_variant }}
+          name: trex-x86_64-${{ matrix.package_variant }}
           path: |
-            \u0024{{ env.APK_DIR }}/\u0024{{ env.APK_PREFIX }}_x86_64.apk
-            \u0024{{ env.APK_DIR }}/output-metadata.json
+            ${{ env.APK_DIR }}/${{ env.APK_PREFIX }}_x86_64.apk
+            ${{ env.APK_DIR }}/output-metadata.json
 
       - name: Upload x86 APK
         uses: actions/upload-artifact@v6
         with:
-          name: trex-x86-\u0024{{ matrix.package_variant }}
+          name: trex-x86-${{ matrix.package_variant }}
           path: |
-            \u0024{{ env.APK_DIR }}/\u0024{{ env.APK_PREFIX }}_x86.apk
-            \u0024{{ env.APK_DIR }}/output-metadata.json
+            ${{ env.APK_DIR }}/${{ env.APK_PREFIX }}_x86.apk
+            ${{ env.APK_DIR }}/output-metadata.json
 
       - name: Upload SHA-256 checksums
         uses: actions/upload-artifact@v6
         with:
-          name: trex-sha256-\u0024{{ matrix.package_variant }}
+          name: trex-sha256-${{ matrix.package_variant }}
           path: |
-            \u0024{{ env.APK_DIR }}/\u0024{{ env.APK_PREFIX }}_sha256sums
-            \u0024{{ env.APK_DIR }}/output-metadata.json
+            ${{ env.APK_DIR }}/${{ env.APK_PREFIX }}_sha256sums
+            ${{ env.APK_DIR }}/output-metadata.json
