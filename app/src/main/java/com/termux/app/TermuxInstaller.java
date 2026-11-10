@@ -35,6 +35,7 @@ import java.util.zip.ZipInputStream;
 
 import static com.termux.shared.termux.TermuxConstants.TERMUX_PREFIX_DIR;
 import static com.termux.shared.termux.TermuxConstants.TERMUX_PREFIX_DIR_PATH;
+import static com.termux.shared.termux.TermuxConstants.TERMUX_HOME_DIR_PATH;
 import static com.termux.shared.termux.TermuxConstants.TERMUX_STAGING_PREFIX_DIR;
 import static com.termux.shared.termux.TermuxConstants.TERMUX_STAGING_PREFIX_DIR_PATH;
 
@@ -220,6 +221,7 @@ final class TermuxInstaller {
 
                     // Recreate env file since termux prefix was wiped earlier
                     TermuxShellEnvironment.writeEnvironmentToFile(activity);
+                    createDefaultBashStartupFiles();
 
                     activity.runOnUiThread(whenDone);
 
@@ -237,6 +239,35 @@ final class TermuxInstaller {
                 }
             }
         }.start();
+    }
+
+    /**
+     * Install the T-Rex prompt for a fresh bootstrap without overwriting existing user startup files.
+     */
+    private static void createDefaultBashStartupFiles() throws Exception {
+        File home = new File(TERMUX_HOME_DIR_PATH);
+        if (!home.isDirectory() && !home.mkdirs()) {
+            throw new IllegalStateException("Could not create Termux home directory: " + home);
+        }
+
+        File bashrc = new File(home, ".bashrc");
+        String bashrcContent = "# T-REX Terminal prompt
+" +
+            "if [[ $- == *i* ]]; then\n" +
+            "    PS1='\\[\\e[1;31m\\]┌──(T-REX㉿Terminal)-[\\w]\\n└─$\\[\\e[0m\\] '\n" +
+            "fi\n";
+        if (!bashrc.exists()) {
+            try (FileOutputStream output = new FileOutputStream(bashrc)) {
+                output.write(bashrcContent.getBytes("UTF-8"));
+            }
+        }
+
+        File bashProfile = new File(home, ".bash_profile");
+        if (!bashProfile.exists()) {
+            try (FileOutputStream output = new FileOutputStream(bashProfile)) {
+                output.write("if [ -f ~/.bashrc ]; then . ~/.bashrc; fi\n".getBytes("UTF-8"));
+            }
+        }
     }
 
     public static void showBootstrapErrorDialog(Activity activity, Runnable whenDone, String message) {
